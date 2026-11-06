@@ -269,39 +269,39 @@ prep_tree() {
     b="${f##*/}"
     [ -f "$f" ] || continue
     case "$b" in
-    customoptions.ini | stub_out.txt | launch_capture.txt | 'Xigncode:'*) continue ;;
+    customoptions.ini | stub_out.txt | launch_capture.txt | 'Xigncode:'* | signature_*) continue ;;
     esac
     [ -e "$GAME/$b" ] || ln -sfn "mojitodata/$b" "$GAME/$b"
   done
   shopt -u nullglob
   # thư mục runtime
-  for d in _cache instance0 instance1 screenshot; do
-    [ -d "$GAME/$d" ] || mkdir -p "$GAME/$d" 2>/dev/null || true
+  # _cache/instance0/screenshot nằm trong whitelist của prepare_data.bat: nếu root có
+  # thư mục THẬT, launcher_update.bat sẽ rmdir /S /Q bản trong mojitodata rồi move thư
+  # mục rỗng vào (fsutil reparsepoint của Wine không nhận symlink) → mất cache/replay.
+  # Nên giữ dữ liệu thật trong mojitodata, root chỉ là symlink.
+  for d in _cache instance0 screenshot; do
+    mkdir -p "$GAME/mojitodata/$d" 2>/dev/null || true
+    [ -e "$GAME/$d" ] || [ -L "$GAME/$d" ] || ln -s "mojitodata/$d" "$GAME/$d"
   done
-  # rác mklink của Wine: "data?" thay vì "data"
-  for d in data locales Xigncode; do
-    if [ -d "$GAME/$d?" ] && [ ! -e "$GAME/$d" ]; then
-      mv "$GAME/$d?" "$GAME/$d" && say "Sửa thư mục rác Wine: $d? → $d"
-    fi
+  [ -d "$GAME/instance1" ] || mkdir -p "$GAME/instance1" 2>/dev/null || true
+  # thư mục rỗng có trong signature của build: thiếu thì pipe.exe verify trả 1
+  # ("directory wound") → launcher từ chối áp patch cập nhật
+  for d in debuglines desynclogs; do
+    [ -d "$GAME/mojitodata/data/$d" ] || mkdir -p "$GAME/mojitodata/data/$d" 2>/dev/null || true
   done
+  # Lưu ý: các mục "X?" ở root KHÔNG phải rác — đó là symlink Windows do mklink của
+  # Wine 11 tạo (xattr user.WINEREPARSE). Symlink unix "X" luôn được ưu tiên nên chúng
+  # vô hại; đừng mv "X?" → "X" (sẽ biến link thành thư mục rỗng).
 }
 
 # ---------- 5. Sức khoẻ dữ liệu (chỉ cảnh báo / khôi phục nếu có backup) ----------
 health_check() {
-  local nb backup="$SCRIPT_DIR/gamedata_backup/image"
+  local nb
   nb=$(find -L "$GAME/mojitodata/data" -name '*.big' 2>/dev/null | wc -l)
-  if [ "$nb" -lt 100 ] && [ -d "$backup" ]; then
-    say "Cây data thiếu ($nb .big) — khôi phục từ backup..."
-    local n=0 src rel dst
-    while IFS= read -r -d '' src; do
-      rel="${src#"$backup"/}"
-      dst="$GAME/$rel"
-      if [ ! -f "$dst" ] || [ "$(stat -c%s "$dst" 2>/dev/null)" != "$(stat -c%s "$src")" ]; then
-        mkdir -p "$(dirname "$dst")"
-        cp -al -- "$src" "$dst" 2>/dev/null && n=$((n + 1))
-      fi
-    done < <(find "$backup" -type f -print0 2>/dev/null | sort -z -u)
-    say "Khôi phục xong: $n file."
+  if [ "$nb" -lt 100 ] && [ -f "$SCRIPT_DIR/gamedata_backup/BUILD" ]; then
+    # backup hardlink: file bị xoá → link lại inode gốc (script tự từ chối nếu khác build)
+    say "Cây data thiếu ($nb .big) — link lại file bị xoá từ backup..."
+    bash "$SCRIPT_DIR/backup-gamedata.sh" --restore | tail -1 || warn "Không khôi phục được từ backup."
     nb=$(find -L "$GAME/mojitodata/data" -name '*.big' 2>/dev/null | wc -l)
   fi
   [ "$nb" -ge 100 ] && say "Cây data: $nb file .big — khoẻ." || warn "Cây data chỉ có $nb file .big — game có thể không vào được."
