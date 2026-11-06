@@ -2,3 +2,5 @@ prefix/
 gamedata_backup/
 data/
 log/
+dl/*
+.vscode
