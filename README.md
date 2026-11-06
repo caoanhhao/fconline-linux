@@ -24,7 +24,7 @@ Script tự kiểm tra "sức khoẻ" của runtime Wine 10: nếu Proton 9.0 đ
 | `garena-setup.sh` | Tạo prefix + cài Garena PC (GPC) + DXVK cho GPC |
 | `setup-webview2.sh` | Cài WebView2 FIXED **109.0.1518.78** (bắt buộc cho màn hình đăng nhập) |
 | `run.sh` | Mở Garena PC để đăng nhập / cài / cập nhật game |
-| `backup-gamedata.sh` | Tạo backup hardlink dữ liệu game (tuỳ chọn, nên làm) |
+| `backup-gamedata.sh` | Backup hardlink dữ liệu game theo build, link lại khi file bị xoá |
 | `check-deps.sh` | Kiểm tra Wine, Proton 9.0/GE-Proton10, DXVK, prefix, dung lượng, file cài |
 | `dl/Garena-v2.0.exe` | Bộ cài Garena PC (~70 MB) |
 | `dl/MicrosoftEdgeWebview_X64_109.0.1518.78.exe` | Bộ cài WebView2 109 (~135 MB) |
@@ -140,7 +140,7 @@ bash check-deps.sh        # kiểm tra môi trường
 bash garena-setup.sh      # tạo prefix + cài Garena PC
 bash setup-webview2.sh    # cài WebView2 109
 bash run.sh               # đăng nhập Garena, cài FC Online (~28 GB)
-bash backup-gamedata.sh   # tuỳ chọn: backup hardlink
+bash backup-gamedata.sh   # tuỳ chọn: backup hardlink build hiện tại
 bash fc-online.sh         # chơi
 ```
 
@@ -241,8 +241,16 @@ Nếu GPC báo **MAINTENANCE**: đó là trạng thái server, không phải l�
 bash backup-gamedata.sh
 ```
 
-Tạo `gamedata_backup/image/` bằng **hardlink** — gần như không tốn thêm dung lượng, cùng ổ đĩa.
-`fc-online.sh` dùng backup này để tự khôi phục nếu cây `data` bị thiếu file `.big`.
+Tạo `gamedata_backup/image/` bằng **hardlink** của `mojitodata/` — không tốn thêm dung lượng.
+Garena làm hỏng dữ liệu bằng cách **xoá file**; hardlink giữ inode gốc nên chỉ cần link lại.
+Script chạy `pipe.exe verify` trước, chỉ backup khi dữ liệu lành, và ghi buildId vào
+`gamedata_backup/BUILD`.
+
+- **Sau mỗi lần cập nhật game**: chạy lại `bash backup-gamedata.sh` — backup build cũ bị thay.
+- **File game bị xoá**: `bash backup-gamedata.sh --restore` link lại file thiếu (thêm `--replaced`
+  để link lại cả file bị xoá-rồi-tạo-lại). Chỉ chạy khi backup **cùng build** với game.
+- `bash backup-gamedata.sh --status`: build của game/backup và số file thiếu/bị thay.
+- `fc-online.sh` tự gọi `--restore` khi thấy thiếu file `.big`.
 
 ### 4.7. Chơi
 
@@ -286,6 +294,29 @@ bash fc-online.sh
   giành nhau bắt/kill `fclauncher`, làm game biến mất ngay sau khi bấm PLAY. Script đã có
   `flock` chặn việc này; nếu thấy thông báo `Đã có fc-online.sh khác đang chạy`, hãy dùng
   cửa sổ cũ thay vì mở thêm.
+
+### Khi có bản cập nhật
+
+Launcher tự kiểm tra (`pipe.exe verify`, 2 lượt ~47 giây, **không có thanh tiến trình**) rồi vá.
+Để yên, đừng đóng launcher giữa chừng.
+
+> **Nếu cập nhật thất bại → xoá game và cài lại.** Dấu hiệu: launcher báo lỗi khi cập nhật,
+> `log/fco-vn.log` có `Error occurred in handler for 'installUpdate'`, hoặc cứ lặp
+> verify → repair mà không vá. Vá lại nhiều lần dưới Wine thường không ăn thua; cài lại là
+> cách đã kiểm chứng (11/2026, build 18 → 19).
+
+```bash
+# 1. đóng launcher/game, rồi xoá game + backup build cũ
+#    (backup là hardlink: còn giữ backup thì xoá game cũng không giải phóng ~28 GB)
+rm -rf prefix/drive_c/Garena/Games/32837 gamedata_backup
+
+# 2. cài lại qua Garena PC (như mục 4.5): đăng nhập → FC Online → Install, chờ xong
+bash run.sh
+
+# 3. chạy game một lần (script tự tạo lại symlink root → mojitodata), rồi backup build mới
+bash fc-online.sh
+bash backup-gamedata.sh
+```
 
 Có thể tạo alias:
 
@@ -362,7 +393,8 @@ Không cần copy `prefix/compat-wine10` từ máy khác nếu runtime khác —
 | `Bạn chỉ có thể chơi game trên 1 nền tảng` | Còn `fczf.exe`/`fclauncher.exe` cũ | `pkill -f fczf; pkill -f fclauncher` rồi bấm PLAY lại |
 | Game đứng ở 99,7% CPU, không vào | `fclauncher` chạy bằng Wine 11 | Đảm bảo script chọn đúng Wine 10 — xem dòng `Wine 10:` khi chạy (Proton 9 hoặc GE-Proton10) |
 | `wineboot` treo ở “Wine Mono Installer” | Tạo prefix bằng `wineboot` trên Proton | Không làm vậy; script copy `default_pfx` |
-| Cây data thiếu `.big` | File bị xoá/hỏng | Chạy `backup-gamedata.sh` trước đó, rồi `fc-online.sh` tự khôi phục |
+| Cập nhật thất bại: `installUpdate: mojito_err_unknown_error`, hoặc lặp verify → repair | Launcher vá lỗi dưới Wine | **Xoá game và cài lại** — xem mục 5 “Khi có bản cập nhật” |
+| Cây data thiếu `.big` | File bị xoá/hỏng | `bash backup-gamedata.sh --restore` (backup phải cùng build) |
 | Lỗi tải Garena | CDN đổi link | Tải tay từ <https://www.garena.vn/gpc>, đặt vào `dl/Garena-v2.0.exe` |
 | Click PLAY không phản hồi | Launcher mất focus | Click vào cửa sổ launcher rồi bấm lại |
 
