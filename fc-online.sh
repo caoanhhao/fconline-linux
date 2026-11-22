@@ -10,9 +10,11 @@
 #   2. Bạn đăng nhập (nếu cần) rồi bấm PLAY.
 #   3. Launcher gọi mojitodata/fclauncher.exe kèm token tươi.
 #      fclauncher (Themida) bị deadlock dưới Wine 11.20, nên script bắt đúng
-#      cmdline của process đó, kill nó, rồi chạy lại y nguyên bằng Wine 10.
-#   4. Game fczf.exe boot bằng Wine 10 + DXVK trong prefix phụ
-#      prefix/compat-wine10 (ổ C:\Garena trỏ về prefix/drive_c/Garena).
+#      cmdline của process đó, kill nó, rồi chạy lại y nguyên bằng runtime game:
+#      GE-Proton11-12 (Wine 11.0) nếu có, không thì Wine 10 (Proton 9 / GE-Proton10).
+#   4. Game fczf.exe boot bằng runtime đó + DXVK trong prefix phụ riêng:
+#      prefix/compat-ge11 (GE-Proton11) hoặc prefix/compat-wine10 (Wine 10)
+#      (ổ C:\Garena trỏ về prefix/drive_c/Garena).
 #
 # VÌ SAO KHÔNG CÒN STUB launch_fco.exe:
 #   fco-vn đọc manifest và gọi thẳng fclauncher.exe, không đi qua launch_fco.exe.
@@ -95,9 +97,13 @@ wine10_healthy() {
 
 find_wine10() {
   local base cand ver seen=""
-  # Proton 9 sạch được ưu tiên; GE-Proton10 là phương án dự phòng khi Proton 9
-  # đã bị trộn DLL (máy này) nhưng vẫn là Wine 10 nên qua được Themida.
+  # GE-Proton11-12 được ưu tiên (Wine 11.22 hệ thống đã chạy được fclauncher nên
+  # Themida không còn đòi Wine 10). Sau đó mới tới Proton 9 sạch / GE-Proton10.
   for base in "${FCO_PROTON9:-}" \
+    "$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-12-x86_64" \
+    "$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-12" \
+    "$HOME/.steam/steam/compatibilitytools.d/GE-Proton11-12-x86_64" \
+    "$HOME/.steam/steam/compatibilitytools.d/GE-Proton11-12" \
     "$HOME/.local/share/Steam/steamapps/common/Proton 9.0" \
     "$HOME/.steam/steam/steamapps/common/Proton 9.0" \
     "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Proton 9.0" \
@@ -113,12 +119,12 @@ find_wine10() {
     # .steam/steam thường là symlink của .local/share/Steam — chỉ thử một lần.
     case " $seen " in *" $base "*) continue ;; esac
     seen="$seen $base"
-    # Themida của fclauncher chỉ qua được Wine 10, nên kiểm tra version thật.
+    # Chỉ nhận runtime đã thử với game: Wine 10.x hoặc Wine 11.0 (GE-Proton11).
     for cand in "$base/files/bin/wine64" "$base/files/bin/wine"; do
       [ -x "$cand" ] || continue
       ver=$("$cand" --version 2>/dev/null)
       case "$ver" in
-      wine-10.*) ;;
+      wine-10.* | wine-11.0*) ;;
       *) continue ;;
       esac
       if ! wine10_healthy "$base"; then
@@ -136,16 +142,21 @@ if [ -n "${FCO_WINE10:-}" ]; then
 else
   WINE10="$(find_wine10)" || WINE10=""
 fi
-[ -n "$WINE10" ] && [ -x "$WINE10" ] || die "Không tìm thấy Wine 10 sạch (Proton 9 / GE-Proton10). Cài Proton 9 trong Steam, cài GE-Proton10-34, hoặc đặt FCO_WINE10=/đường/dẫn/wine64."
+[ -n "$WINE10" ] && [ -x "$WINE10" ] || die "Không tìm thấy runtime game (GE-Proton11-12 / Proton 9 / GE-Proton10). Cài GE-Proton11-12, hoặc đặt FCO_WINE10=/đường/dẫn/wine."
 PROTON_FILES="$(cd "$(dirname "$WINE10")/.." && pwd -P)"
 DXVK_SRC="${FCO_DXVK_SRC:-$PROTON_FILES/lib/wine/dxvk/x86_64-windows}"
-say "Wine 10: $WINE10"
+WINE10_VER=$("$WINE10" --version 2>/dev/null)
+say "Wine game: $WINE10 ($WINE10_VER)"
 
 command -v wine >/dev/null || die "Cần wine hệ thống trong PATH để mở launcher UI."
 WINEUI="$(command -v wine)"
 
 # ---------- 3. Prefix phụ cho Wine 10 + DXVK ----------
-COMPAT="${FCO_COMPAT_PREFIX:-$PREFIX/compat-wine10}"
+# Mỗi đời Wine một prefix riêng: đổi runtime trong cùng prefix sẽ khiến ensure_compat xoá nó.
+case "$WINE10_VER" in
+wine-11.*) COMPAT="${FCO_COMPAT_PREFIX:-$PREFIX/compat-ge11}" ;;
+*) COMPAT="${FCO_COMPAT_PREFIX:-$PREFIX/compat-wine10}" ;;
+esac
 DEFAULT_PFX="$PROTON_FILES/share/default_pfx"
 
 ensure_compat() {
@@ -308,14 +319,23 @@ health_check() {
 }
 
 # ---------- 6. Tiến trình ----------
-game_running() {
-  local p s
-  for p in $(pgrep -f -- '-garenaToken' 2>/dev/null); do
-    s=$(ps -o stat= -p "$p" 2>/dev/null)
-    case "$s" in Z* | "") ;; *) return 0 ;; esac
-  done
-  return 1
+# Phân biệt Wine 11 / Wine 10 qua WINEPREFIX của process:
+#   $PREFIX → Wine hệ thống (11), $COMPAT → Wine 10. Chỉ game trong $COMPAT mới tính là "đã vào".
+proc_prefix() {
+  tr '\0' '\n' <"/proc/$1/environ" 2>/dev/null | sed -n 's/^WINEPREFIX=//p' | head -1
 }
+# In pid các process khớp regex $1 (cmdline), còn sống, chạy trong prefix $2.
+find_pids_in() {
+  local p s
+  for p in $(pgrep -f -- "$1" 2>/dev/null); do
+    s=$(ps -o stat= -p "$p" 2>/dev/null)
+    case "$s" in Z* | "") continue ;; esac
+    [ "$(proc_prefix "$p")" = "$2" ] && printf '%s\n' "$p"
+  done
+  return 0
+}
+game_pids() { find_pids_in '-garenaToken' "$COMPAT"; }
+game_running() { [ -n "$(game_pids)" ]; }
 ui_running() {
   local p s
   for p in $(pgrep -f 'fco-vn\.exe' 2>/dev/null); do
@@ -324,25 +344,25 @@ ui_running() {
   done
   return 1
 }
+# fclauncher do launcher (Wine 11) gọi — chỉ tìm trong prefix gốc để không bắt nhầm bản Wine 10.
 find_fclauncher_pid() {
-  local p cmd
-  for p in /proc/[0-9]*; do
-    [ -r "$p/cmdline" ] || continue
-    cmd=$(tr '\0' '\n' <"$p/cmdline" 2>/dev/null) || continue
-    case "$cmd" in
-    *fclauncher.exe*/goptoken:* | *fclauncher.exe*/encryptedtoken:*)
-      printf '%s\n' "${p#/proc/}"
-      return 0
-      ;;
-    esac
+  local p
+  p=$(find_pids_in 'fclauncher\.exe.*/(goptoken|encryptedtoken):' "$PREFIX" | head -1)
+  [ -n "$p" ] && printf '%s\n' "$p"
+}
+# fczf lọt ra từ fclauncher Wine 11 (kịp spawn trước khi bị bắt) sẽ deadlock → kill.
+kill_stray_games() {
+  local p
+  for p in $(find_pids_in '-garenaToken' "$PREFIX"); do
+    warn "fczf.exe chạy bằng Wine 11 (pid $p) — tắt, chỉ giữ bản Wine 10."
+    kill -9 "$p" 2>/dev/null || true
   done
-  return 1
 }
 
 focus_game() {
   command -v hyprctl >/dev/null 2>&1 || return 0
   local pid
-  pid=$(pgrep -f -- '-garenaToken' 2>/dev/null | head -1)
+  pid=$(game_pids | head -1)
   [ -n "$pid" ] && hyprctl dispatch "hl.dsp.focus({ window = \"pid:$pid\" })" >/dev/null 2>&1 || true
 }
 
@@ -359,6 +379,7 @@ prep_tree
 ensure_compat
 health_check
 
+kill_stray_games
 if game_running; then
   say "FC Online đang chạy sẵn — mở cửa sổ FC ONLINE lên chơi thôi!"
   focus_game
@@ -366,7 +387,7 @@ if game_running; then
 fi
 
 # Dọn fclauncher cũ còn treo (token cũ) để không bắt nhầm.
-for p in $(find_fclauncher_pid); do
+for p in $(find_pids_in 'fclauncher\.exe' "$PREFIX"); do
   kill -9 "$p" 2>/dev/null || true
 done
 
@@ -409,34 +430,44 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   fi
   if pid=$(find_fclauncher_pid); then
     tr '\0' '\n' <"/proc/$pid/cmdline" >"$SCRIPT_DIR/data/fclauncher.args" 2>/dev/null || true
-    say "Bắt được fclauncher (pid $pid) — chuyển sang Wine 10 + DXVK..."
+    say "Bắt được fclauncher (pid $pid) — chuyển sang $WINE10_VER + DXVK..."
     kill -9 "$pid" 2>/dev/null || true
     for _ in 1 2 3 4 5 6 7 8 9 10; do
       kill -0 "$pid" 2>/dev/null || break
       sleep 0.1
     done
-    # dọn các fclauncher còn lại của Wine 11 (nếu bấm PLAY nhiều lần)
-    for p in $(find_fclauncher_pid); do kill -9 "$p" 2>/dev/null || true; done
+    # dọn các fclauncher còn lại của Wine 11 (nếu bấm PLAY nhiều lần) và fczf nó kịp spawn
+    for p in $(find_pids_in 'fclauncher\.exe' "$PREFIX"); do kill -9 "$p" 2>/dev/null || true; done
+    kill_stray_games
     mapfile -t ARGS < <(tr -d '\r' <"$SCRIPT_DIR/data/fclauncher.args")
     [ "${#ARGS[@]}" -gt 0 ] || {
       warn "Không đọc được tham số fclauncher."
       continue
     }
+    # Gọi thẳng wine64 thì không qua script proton → phải tự bật fsync (thiếu nó mọi wait
+    # đi qua wineserver, chậm hơn). Không chữa được lỗi treo hình lúc chuyển trận — đó là
+    # livelock trong code game, xem log/hang-*-bt.txt. FCO_FSYNC=0 để tắt.
+    # FCO_CPU_TOPOLOGY="N:c0,c1,..." → WINE_CPU_TOPOLOGY (giới hạn nhân game thấy). Chỉ dùng
+    # P-core (8:0,...,7) đã thử ngày 21/11/2026, vẫn treo.
     (
       cd "$GAME" && nohup env WINEPREFIX="$COMPAT" WINEDEBUG=-all DISPLAY="${DISPLAY:-:1}" \
+        WINEFSYNC="${FCO_FSYNC:-1}" ${FCO_CPU_TOPOLOGY:+WINE_CPU_TOPOLOGY=$FCO_CPU_TOPOLOGY} \
         WINEDLLOVERRIDES="d3d10core,d3d11,d3d8,d3d9,dxgi=n" \
         "$WINE10" "${ARGS[@]}" >>"$LOG_DIR/fclauncher10.log" 2>&1 9>&- &
       disown
     ) 2>/dev/null
     break
   fi
-  sleep 1
+  # fclauncher Wine 11 spawn fczf chỉ sau ~1 giây → poll dày để bắt kịp.
+  sleep 0.2
 done
 
 # ---------- 10. Chờ fczf ----------
 for _ in $(seq 1 120); do
+  kill_stray_games
   if game_running; then
-    say "✔ FC ONLINE đã vào game bằng Wine 10 — chúc chơi vui!"
+    kill_stray_games
+    say "✔ FC ONLINE đã vào game bằng $WINE10_VER — chúc chơi vui!"
     focus_game
     exit 0
   fi
