@@ -7,12 +7,16 @@ theo đúng luồng đã kiểm chứng:
 bash fc-online.sh  →  launcher FC Online  →  bấm PLAY  →  vào game
 ```
 
-Đã test thành công trên Hyprland (Wayland), Wine hệ thống 11.20 + **Proton 9.0 hoặc GE-Proton10-34**
-(đều là Wine 10) + DXVK, màn hình 2560×1080. Các DE/WM khác (GNOME, KDE, X11) cũng dùng được
-miễn có `DISPLAY`/XWayland.
+Đã test thành công trên Hyprland (Wayland), Wine hệ thống 11.x + **GE-Proton11-12** (Wine 11.0)
++ DXVK, màn hình 2560×1080. Các DE/WM khác (GNOME, KDE, X11) cũng dùng được miễn có
+`DISPLAY`/XWayland.
 
-Script tự kiểm tra "sức khoẻ" của runtime Wine 10: nếu Proton 9.0 đã bị trộn DLL của bản khác
-(ví dụ DLL Wine 11), script bỏ qua và chuyển sang GE-Proton10-34 nếu có.
+> **Dùng GE-Proton11-12 để game không bị đứng hình.** Với Proton 9.0 / GE-Proton10-34 (Wine 10)
+> và cả Wine hệ thống 11.22, game hay đứng hình (hình đứng, tiếng vẫn chạy) lúc vào trận hoặc
+> chuyển hiệp. Chạy bằng GE-Proton11-12 thì chơi lâu không còn gặp (11/2026).
+
+Script ưu tiên GE-Proton11-12; nếu không có mới dùng Wine 10 (Proton 9.0 sạch → GE-Proton10-34).
+Runtime Wine 10 được kiểm tra "sức khoẻ": Proton 9.0 bị trộn DLL của bản khác sẽ bị bỏ qua.
 
 ---
 
@@ -20,12 +24,12 @@ Script tự kiểm tra "sức khoẻ" của runtime Wine 10: nếu Proton 9.0 đ
 
 | File / thư mục | Vai trò |
 |---|---|
-| `fc-online.sh` | **Script chính** — mở launcher, bắt `fclauncher`, chuyển sang Wine 10, chờ game |
+| `fc-online.sh` | **Script chính** — mở launcher, bắt `fclauncher`, chuyển sang GE-Proton11-12 (hoặc Wine 10), chờ game |
 | `garena-setup.sh` | Tạo prefix + cài Garena PC (GPC) + DXVK cho GPC |
 | `setup-webview2.sh` | Cài WebView2 FIXED **109.0.1518.78** (bắt buộc cho màn hình đăng nhập) |
 | `run.sh` | Mở Garena PC để đăng nhập / cài / cập nhật game |
 | `backup-gamedata.sh` | Backup hardlink dữ liệu game theo build, link lại khi file bị xoá |
-| `check-deps.sh` | Kiểm tra Wine, Proton 9.0/GE-Proton10, DXVK, prefix, dung lượng, file cài |
+| `check-deps.sh` | Kiểm tra Wine, Proton 9.0/GE-Proton10, DXVK, prefix, dung lượng, file cài (chưa biết GE-Proton11-12) |
 | `dl/Garena-v2.0.exe` | Bộ cài Garena PC (~70 MB) |
 | `dl/MicrosoftEdgeWebview_X64_109.0.1518.78.exe` | Bộ cài WebView2 109 (~135 MB) |
 | `NOTES-webview2-109.md` | Ghi chú kỹ thuật về WebView2 |
@@ -46,7 +50,8 @@ Script tự kiểm tra "sức khoẻ" của runtime Wine 10: nếu Proton 9.0 đ
 | GPU | Driver Vulkan hoạt động (Mesa/AMD, NVIDIA proprietary…) |
 | Dung lượng | **≥ 45 GB** trống (game ~28 GB + prefix + tải về) |
 | Wine hệ thống | **11.x** (đã test 11.20) — dùng cho launcher Electron `fco-vn.exe` |
-| Proton 9.0 **hoặc** GE-Proton10 | Bắt buộc một trong hai — cung cấp Wine **10.0** cho `fclauncher.exe`/`fczf.exe`. Script tự bỏ qua runtime bị trộn DLL |
+| **GE-Proton11-12** (khuyên dùng) | Cung cấp Wine **11.0** cho `fclauncher.exe`/`fczf.exe` — bản duy nhất đã chơi lâu không bị đứng hình |
+| Proton 9.0 / GE-Proton10 (dự phòng) | Wine **10.0**, chỉ dùng khi không có GE-Proton11-12. Chạy được nhưng hay đứng hình lúc vào trận |
 | Tài khoản | Tài khoản Garena có quyền chơi FC Online VN |
 | Mạng | Tải Garena/game/WebView2 (nếu chưa có sẵn file) |
 
@@ -80,9 +85,38 @@ wine --version     # phải là wine-11.x
 > Nếu `wine --version` ra `wine-10.x`, launcher `fco-vn.exe` có thể crash ngay khi tạo cửa sổ.
 > Nâng lên Wine 11 trước khi tiếp tục.
 
-### Cài Proton 9.0 (hoặc GE-Proton10)
+### Cài GE-Proton11-12 (khuyên dùng)
 
-**Cách 1 — Proton 9.0 trong Steam (ưu tiên):**
+Tải tarball từ GitHub `GloriousEggroll/proton-ge-custom` (hoặc cài bằng **ProtonUp-Qt**) rồi giải
+nén vào thư mục Proton của Steam:
+
+```bash
+cd /tmp
+curl -LO https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-12/GE-Proton11-12-x86_64.tar.gz
+curl -LO https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-12/GE-Proton11-12-x86_64.sha512sum
+sha512sum -c GE-Proton11-12-x86_64.sha512sum
+mkdir -p ~/.local/share/Steam/compatibilitytools.d
+tar -xzf GE-Proton11-12-x86_64.tar.gz -C ~/.local/share/Steam/compatibilitytools.d/
+```
+
+Kết quả là thư mục `~/.local/share/Steam/compatibilitytools.d/GE-Proton11-12-x86_64/`
+(ProtonUp-Qt đặt tên `GE-Proton11-12` — script nhận cả hai, ở `~/.local/share/Steam` lẫn
+`~/.steam/steam`). Kiểm tra:
+
+```bash
+~/.local/share/Steam/compatibilitytools.d/GE-Proton11-12-x86_64/files/bin/wine --version
+# → wine-11.0 (Staging)
+```
+
+> Bản GE-Proton11 mới hơn (11-13, 11-14…) **chưa được thử** và script không tự dò. Muốn thử thì
+> đặt `FCO_WINE10=<thư mục>/files/bin/wine` (bản đó phải báo `wine-11.0`).
+
+### Cài Proton 9.0 hoặc GE-Proton10 (dự phòng, Wine 10)
+
+Chỉ cần khi không dùng được GE-Proton11-12. Game chạy được nhưng **hay đứng hình** lúc vào trận
+hoặc chuyển hiệp.
+
+**Cách 1 — Proton 9.0 trong Steam:**
 
 1. Mở Steam → **Library** → ô tìm kiếm gõ `Proton 9.0`.
 2. Chọn **Proton 9.0** → **Install** (hoặc mở `steam://install/2805730`).
@@ -100,7 +134,7 @@ export FCO_WINE10="$HOME/path/Steam/steamapps/common/Proton 9.0/files/bin/wine64
 
 **Cách 2 — GE-Proton10-34 (khi Proton 9 hỏng hoặc Steam không cài được):**
 
-GE-Proton10-34 cũng là **Wine 10.0** nên qua được Themida của `fclauncher.exe`. Cài bằng
+GE-Proton10-34 cũng là **Wine 10.0**. Cài bằng
 **ProtonUp-Qt**, hoặc tải tarball từ GitHub `GloriousEggroll/proton-ge-custom` rồi giải nén vào:
 
 ```text
@@ -114,9 +148,9 @@ Kiểm tra version thật:
 # → wine-10.0 (Staging)
 ```
 
-Script tự dò mọi `GE-Proton10-*` (ưu tiên `-34`) trong
+Khi không có GE-Proton11-12, script tự dò mọi `GE-Proton10-*` (ưu tiên `-34`) trong
 `~/.steam/steam/compatibilitytools.d/` và `~/.local/share/Steam/compatibilitytools.d/`.
-Có thể chỉ định thủ công:
+Có thể chỉ định thủ công (kể cả khi đã cài GE-Proton11-12):
 
 ```bash
 export FCO_WINE10="$HOME/.steam/steam/compatibilitytools.d/GE-Proton10-34/files/bin/wine64"
@@ -264,15 +298,23 @@ Luồng sẽ diễn ra:
 2. Bạn bấm **PLAY**.
 3. Launcher gọi `fclauncher.exe` kèm token tươi.
 4. Script phát hiện process này, lưu tham số, kill nó.
-5. Script chạy lại **đúng tham số** bằng **Wine 10 + DXVK** trong `prefix/compat-wine10`.
+5. Script chạy lại **đúng tham số** bằng **GE-Proton11-12 + DXVK** trong `prefix/compat-ge11`
+   (hoặc Wine 10 trong `prefix/compat-wine10` nếu không có GE-Proton11-12).
 6. `fczf.exe` khởi động fullscreen → vào game.
+
+Dòng `Wine game: ... (wine-11.0 (Staging))` khi chạy script cho biết đang dùng runtime nào. Nếu nó
+ra `wine-10.*` thì script chưa thấy GE-Proton11-12 — game có thể đứng hình.
+
+> **Bấm PLAY trong vòng 10 phút** sau khi launcher hiện. Quá thời gian, script thoát; nếu sau đó
+> mới bấm PLAY thì launcher tự mở game bằng Wine hệ thống, **không** qua GE-Proton11-12.
 
 Trước đó script tự kiểm tra:
 
-- **Runtime Wine 10:** nếu Proton 9.0 bị trộn DLL, script in `⚠ Bỏ qua ...: DLL builtin bị trộn/hỏng`
-  và dùng GE-Proton10-34 (nếu có). Đây là hành vi đúng, không phải lỗi.
-- **Prefix phụ:** nếu `compat-wine10` được tạo bởi runtime khác, script tạo lại prefix
-  (cấu hình đồ hoạ lưu trong prefix game có thể trở về mặc định).
+- **Runtime Wine 10** (khi không có GE-Proton11-12): nếu Proton 9.0 bị trộn DLL, script in
+  `⚠ Bỏ qua ...: DLL builtin bị trộn/hỏng` và dùng GE-Proton10-34 (nếu có).
+- **Prefix phụ:** mỗi đời Wine có prefix riêng (`compat-ge11` / `compat-wine10`), nên đổi qua lại
+  không xoá prefix kia. Nếu prefix được tạo bởi runtime khác cùng đời, script tạo lại nó
+  (cấu hình đồ hoạ lưu trong prefix có thể trở về mặc định).
 - **Chống chạy trùng:** chỉ một `fc-online.sh` được chạy tại một thời điểm. Nếu có cửa sổ khác
   đang chờ PLAY, script mới sẽ báo `Đã có fc-online.sh khác đang chạy` và thoát.
 
@@ -333,19 +375,21 @@ echo "alias fco='bash $HOME/projects/fconline/fc-online.sh'" >> ~/.bashrc
 fco-vn.exe (Electron, Wine 11)
    │  đọc game.json, gọi kèm token
    ▼
-fclauncher.exe (Themida)  ──►  deadlock trên Wine 11
+fclauncher.exe (Themida)  ──►  deadlock trên Wine hệ thống 11.20
    │  script bắt /proc/<pid>/cmdline
    ▼
-fclauncher.exe chạy lại bằng Wine 10 + DXVK
+fclauncher.exe chạy lại bằng GE-Proton11-12 (hoặc Wine 10) + DXVK
    ▼
 fczf.exe  →  game
 ```
 
-- `prefix/` — prefix chính, chứa Garena + game, do Wine 11 quản lý.
-- `prefix/compat-wine10/` — prefix phụ cho Wine 10; `C:\Garena` là symlink tuyệt đối
-  trỏ về `prefix/drive_c/Garena`, nên không nhân đôi 28 GB.
-- **Chọn runtime:** Proton 9.0 sạch được ưu tiên; nếu bị trộn DLL, script dùng
-  `GE-Proton10-*` (ưu tiên `-34`). Mọi ứng viên phải báo `wine-10.*`.
+- `prefix/` — prefix chính, chứa Garena + game, do Wine hệ thống 11 quản lý.
+- `prefix/compat-ge11/` (GE-Proton11-12) hoặc `prefix/compat-wine10/` (Wine 10) — prefix phụ
+  cho game; `C:\Garena` là symlink tuyệt đối trỏ về `prefix/drive_c/Garena`, nên không nhân
+  đôi 28 GB.
+- **Chọn runtime:** `GE-Proton11-12` được ưu tiên; không có thì Proton 9.0 sạch, rồi
+  `GE-Proton10-*` (ưu tiên `-34`). Ứng viên phải báo `wine-11.0*` hoặc `wine-10.*`.
+- **fsync:** script gọi thẳng `wine` (không qua script `proton`) nên tự đặt `WINEFSYNC=1`.
 - **Kiểm tra sức khoẻ:** bỏ qua runtime nếu `advapi32.dll` forward `SystemFunction036` sang
   `cryptbase` nhưng thiếu `cryptbase.dll`, hoặc mtime `ntdll.dll`/`advapi32.dll` lệch > 7 ngày.
 - **Prefix phụ:** file `.fco-runtime` ghi runtime đã tạo prefix; nếu runtime đổi, prefix được
@@ -367,11 +411,12 @@ Nếu đã có `prefix/` chứa Garena + game từ máy khác:
 1. Copy `prefix/` sang cùng vị trí trong thư mục bộ file (hoặc chỉ `prefix/drive_c/Garena`
    nếu muốn cài Garena lại bằng `garena-setup.sh`).
 2. Chạy `bash check-deps.sh` — cảnh báo symlink hỏng là bình thường.
-3. Chạy `bash fc-online.sh` một lần: script tạo lại `prefix/compat-wine10`, sửa **mọi** symlink
-   và copy DXVK 64-bit + 32-bit trước khi mở launcher.
+3. Cài GE-Proton11-12 (mục 2) rồi chạy `bash fc-online.sh` một lần: script tạo
+   `prefix/compat-ge11`, sửa **mọi** symlink và copy DXVK 64-bit + 32-bit trước khi mở launcher.
 4. Nếu Proton/GE-Proton nằm ở đường dẫn khác, đặt `FCO_WINE10` trước khi chạy.
 
-Không cần copy `prefix/compat-wine10` từ máy khác nếu runtime khác — script sẽ xoá và tạo lại.
+Không cần copy `prefix/compat-ge11` / `prefix/compat-wine10` từ máy khác — nếu runtime khác,
+script sẽ xoá và tạo lại.
 
 ---
 
@@ -379,19 +424,20 @@ Không cần copy `prefix/compat-wine10` từ máy khác nếu runtime khác —
 
 | Triệu chứng | Nguyên nhân | Cách xử lý |
 |---|---|---|
-| `Không tìm thấy Wine 10 sạch` | Chưa cài Proton 9.0/GE-Proton10, hoặc mọi runtime đều hỏng | Cài Proton 9.0 hoặc GE-Proton10-34; đặt `FCO_WINE10`; chạy `bash check-deps.sh` |
+| **Đang chơi thì đứng hình** (hình đứng, tiếng vẫn chạy) lúc vào trận / chuyển hiệp | Game chạy bằng Wine 10 (Proton 9.0 / GE-Proton10) hoặc Wine hệ thống — bị trên cả hai | Cài **GE-Proton11-12** (mục 2); kiểm tra dòng `Wine game:` ra `wine-11.0`; bấm PLAY trong 10 phút để game đi qua script |
+| `Không tìm thấy runtime game` | Chưa cài GE-Proton11-12 / Proton 9.0 / GE-Proton10, hoặc mọi runtime đều hỏng | Cài GE-Proton11-12; hoặc đặt `FCO_WINE10`; chạy `bash check-deps.sh` |
 | `⚠ Bỏ qua ...: DLL builtin bị trộn/hỏng` | Proton 9 bị ghi đè DLL của bản khác (Wine 11) | Bình thường nếu máy có GE-Proton10 — script tự dùng bản đó. Muốn sửa Proton 9: Steam → Verify integrity of tool files. **Không copy DLL giữa các bản Proton** |
 | `fclauncher10.log` báo `unimplemented function advapi32.dll.SystemFunction036` / thiếu `cryptbase.dll` | Runtime Wine 10 không đồng bộ (DLL Wine 11 trộn với Wine 10) | Dùng GE-Proton10-34 hoặc Verify Proton 9.0; không chép DLL từ GE-Proton11 sang Proton 9 |
 | Bấm PLAY xong launcher/game biến mất, có nhiều terminal đang chạy | Nhiều `fc-online.sh` chạy song song, giành bắt/kill `fclauncher` | Chỉ giữ **một** cửa sổ; kiểm tra `pgrep -af fc-online.sh`; script đã có `flock` chặn |
 | `Đã có fc-online.sh khác đang chạy` | Instance khác đang giữ lock | Dùng cửa sổ cũ; đóng terminal cũ nếu treo. Không mở thêm instance |
 | Launcher crash ngay khi mở | Wine hệ thống < 11 | Nâng Wine lên 11.x |
-| `Could Not Get Primary Adapter Handle` | Thiếu DXVK (64-bit hoặc 32-bit) trong `compat-wine10` | Chạy lại `fc-online.sh`; kiểm tra `check-deps.sh`; cài driver Vulkan |
+| `Could Not Get Primary Adapter Handle` | Thiếu DXVK (64-bit hoặc 32-bit) trong prefix phụ (`compat-ge11` / `compat-wine10`) | Chạy lại `fc-online.sh`; kiểm tra `check-deps.sh`; cài driver Vulkan |
 | Màn hình đăng nhập trắng / launcher treo | Thiếu/sai WebView2 | `bash setup-webview2.sh`, kiểm tra thư mục `109.0.1518.78` |
-| Game lỗi driver/`.sys`, vào rồi thoát | Symlink hỏng trong `compat-wine10` (nhất là `system32/drivers/`) | Xoá `prefix/compat-wine10` rồi chạy lại — script tạo prefix mới và sửa **mọi** symlink |
+| Game lỗi driver/`.sys`, vào rồi thoát | Symlink hỏng trong prefix phụ (nhất là `system32/drivers/`) | Xoá `prefix/compat-ge11` (hoặc `compat-wine10`) rồi chạy lại — script tạo prefix mới và sửa **mọi** symlink |
 | `게임파일 변조가 감지되었습니다` | Tham số/token dính `\r` hoặc token cũ | Chạy lại `fc-online.sh` để lấy token mới |
 | `Hết phiên` / `30000532` | Token hết hạn | Đóng launcher, chạy lại, đăng nhập, bấm PLAY |
 | `Bạn chỉ có thể chơi game trên 1 nền tảng` | Còn `fczf.exe`/`fclauncher.exe` cũ | `pkill -f fczf; pkill -f fclauncher` rồi bấm PLAY lại |
-| Game đứng ở 99,7% CPU, không vào | `fclauncher` chạy bằng Wine 11 | Đảm bảo script chọn đúng Wine 10 — xem dòng `Wine 10:` khi chạy (Proton 9 hoặc GE-Proton10) |
+| Game đứng ở 99,7% CPU, không vào | `fclauncher` chạy bằng Wine hệ thống (11.20) | Đảm bảo game đi qua script — xem dòng `Wine game:` khi chạy (GE-Proton11-12 hoặc Wine 10) |
 | `wineboot` treo ở “Wine Mono Installer” | Tạo prefix bằng `wineboot` trên Proton | Không làm vậy; script copy `default_pfx` |
 | Cập nhật thất bại: `installUpdate: mojito_err_unknown_error`, hoặc lặp verify → repair | Launcher vá lỗi dưới Wine | **Xoá game và cài lại** — xem mục 5 “Khi có bản cập nhật” |
 | Cây data thiếu `.big` | File bị xoá/hỏng | `bash backup-gamedata.sh --restore` (backup phải cùng build) |
@@ -402,16 +448,18 @@ Xem log khi cần:
 
 ```bash
 tail -f log/fco-vn.log          # launcher UI
-tail -f log/fclauncher10.log    # fclauncher chạy bằng Wine 10
+tail -f log/fclauncher10.log    # fclauncher/game chạy bằng runtime game (tên file giữ từ thời Wine 10)
 tail -f log/garena-setup.log    # quá trình cài GPC
 ```
 
-Kiểm tra game đang chạy:
+Kiểm tra game đang chạy bằng Proton nào:
 
 ```bash
-pgrep -af -- '-garenaToken'
-tr '\0' '\n' </proc/$(pgrep -f -- '-garenaToken' | head -1)/environ | grep WINEPREFIX
-# → .../prefix/compat-wine10
+pid=$(pgrep -f -- '-garenaToken' | head -1)
+tr '\0' '\n' </proc/$pid/environ | grep WINEPREFIX
+# → .../prefix/compat-ge11
+grep -m1 -o '/[^ ]*/ntdll\.so' /proc/$pid/maps
+# → .../GE-Proton11-12-x86_64/files/lib/wine/x86_64-unix/ntdll.so
 ```
 
 ---
@@ -421,10 +469,12 @@ tr '\0' '\n' </proc/$(pgrep -f -- '-garenaToken' | head -1)/environ | grep WINEP
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
 | `FCO_PREFIX` | `./prefix` | Đổi vị trí prefix |
-| `FCO_WINE10` | tự tìm Proton 9.0 sạch → `GE-Proton10-*` (ưu tiên 34) | Đường dẫn `wine64` bản Wine 10. **Đặt biến này sẽ bỏ qua bước kiểm tra sức khoẻ** |
-| `FCO_PROTON9` | — | Thư mục Proton 9.0/GE-Proton10 khác (được thử đầu tiên và vẫn qua kiểm tra sức khoẻ) |
-| `FCO_COMPAT_PREFIX` | `prefix/compat-wine10` | Prefix phụ cho game; đổi runtime sẽ khiến prefix được tạo lại |
-| `FCO_DXVK_SRC` | runtime Wine 10 đã chọn: `lib/wine/dxvk/x86_64-windows` | Nguồn DXVK; script tự lấy bản `i386-windows` bên cạnh |
+| `FCO_WINE10` | tự tìm `GE-Proton11-12` → Proton 9.0 sạch → `GE-Proton10-*` (ưu tiên 34) | Đường dẫn `wine`/`wine64` của runtime chạy game (tên biến giữ từ thời Wine 10). **Đặt biến này sẽ bỏ qua bước kiểm tra sức khoẻ** |
+| `FCO_PROTON9` | — | Thư mục Proton khác (được thử đầu tiên và vẫn qua kiểm tra sức khoẻ) |
+| `FCO_COMPAT_PREFIX` | `prefix/compat-ge11` (Wine 11) / `prefix/compat-wine10` (Wine 10) | Prefix phụ cho game; đổi runtime sẽ khiến prefix được tạo lại |
+| `FCO_DXVK_SRC` | runtime đã chọn: `lib/wine/dxvk/x86_64-windows` | Nguồn DXVK; script tự lấy bản `i386-windows` bên cạnh |
+| `FCO_FSYNC` | `1` | `0` để tắt fsync cho game |
+| `FCO_CPU_TOPOLOGY` | — | Đặt `WINE_CPU_TOPOLOGY` (ví dụ `8:0,1,2,3,4,5,6,7`) để giới hạn nhân CPU game thấy. Chỉ để thử nghiệm — không chữa được đứng hình |
 | `FCO_DISPLAY` | `$DISPLAY` hoặc `:1` | Display khi chạy Wine |
 | `WEBVIEW2_PAYLOAD` | `dl/MicrosoftEdgeWebview_X64_109.0.1518.78.exe` | Bộ cài WebView2 khác |
 
@@ -432,6 +482,12 @@ Ví dụ đặt prefix ở ổ khác:
 
 ```bash
 FCO_PREFIX=/mnt/games/fconline bash fc-online.sh
+```
+
+Ví dụ tạm quay về Wine 10 (GE-Proton10-34) dù đã cài GE-Proton11-12:
+
+```bash
+FCO_WINE10=~/.local/share/Steam/compatibilitytools.d/GE-Proton10-34/files/bin/wine64 bash fc-online.sh
 ```
 
 ---
@@ -455,10 +511,11 @@ Giữ lại script + `dl/` nếu muốn cài lại. Không cần xoá gì trong 
 - Không chia sẻ thư mục `prefix/` hoặc file chứa token: chúng gắn với tài khoản của bạn.
 - Không dùng token cũ (`data/launch_capture.last.txt`, `token_fresh.txt`) — luôn để launcher cấp token mới.
 - Game update: chỉ cần mở `run.sh` (GPC) để cập nhật, sau đó chạy `fc-online.sh`.
+- **Dùng GE-Proton11-12** — Wine 10 và Wine hệ thống đều hay đứng hình lúc vào trận.
 - **Không trộn DLL** giữa Proton 9.0, GE-Proton10 và Proton 11. Nếu Proton 9 đã bị trộn, đừng
   "sửa" bằng cách copy thêm DLL — script sẽ bỏ qua runtime đó và chuyển sang GE-Proton10.
-- `prefix/compat-wine10` là prefix phụ, **có thể xoá và tạo lại** mà không mất dữ liệu game.
-  Cấu hình đồ hoạ lưu trong prefix này sẽ về mặc định khi runtime đổi.
+- `prefix/compat-ge11` và `prefix/compat-wine10` là prefix phụ, **có thể xoá và tạo lại** mà không
+  mất dữ liệu game. Cấu hình đồ hoạ lưu trong prefix này sẽ về mặc định khi runtime đổi.
 - Nếu copy prefix sang máy khác, luôn chạy qua `fc-online.sh` một lần để script sửa **mọi**
   symlink (kể cả `system32/drivers/`) trước khi vào game.
 
